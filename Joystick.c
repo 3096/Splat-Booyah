@@ -148,6 +148,7 @@ void HID_Task(void)
 
 typedef enum {
 	SYNC_CONTROLLER,
+	BOOYAH,
 	SYNC_POSITION,
 	ZIG_ZAG,
 	MOVE,
@@ -239,6 +240,8 @@ void complete_zig_zag_pattern(USB_JoystickReport_Input_t *const ReportData)
 	return;
 }
 
+bool moving_left = true;
+
 // Prepare the next report for the host
 void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 {
@@ -281,7 +284,7 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 		if (command_count > ms_2_count(2000))
 		{
 			command_count = 0;
-			state = SYNC_POSITION;
+			state = BOOYAH;
 		}
 		else
 		{
@@ -291,6 +294,47 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 				ReportData->Button |= SWITCH_A;
 			command_count++;
 		}
+		break;
+	case BOOYAH: ;
+		bool a_down = false;
+		if(command_count % 2 != 0)
+		{
+			ReportData->Button |= SWITCH_A | SWITCH_RCLICK;
+			a_down = true;
+		}
+
+		if(command_count/60 % 3 != 0)
+			ReportData->Button |= SWITCH_ZR;
+		else
+			ReportData->Button |= SWITCH_ZL;
+
+		int rnd;
+
+		// Booyah!
+		if((rnd = rand() % 512) == 0 && a_down)
+			ReportData->HAT = HAT_BOTTOM;
+
+		if((rnd = rand() % 16) == 0)
+			moving_left = !moving_left;
+		if(moving_left)
+			ReportData->LX = STICK_MIN;
+		else
+			ReportData->LX = STICK_MAX;
+
+		ReportData->LY = STICK_MIN;
+
+		if((rnd = rand() % 16) == 0)
+		{
+			if((rnd = rand() % 4) == 0)
+				moving_left = !moving_left;
+			if(moving_left)
+				ReportData->RX = STICK_MIN;
+			else
+				ReportData->RX = STICK_MAX;
+		}
+
+
+		command_count++;
 		break;
 	case SYNC_POSITION:
 		if (command_count > ms_2_count(4000))
@@ -344,7 +388,7 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 		return;
 	}
 
-	if (state != SYNC_CONTROLLER && state != SYNC_POSITION && state != DONE)
+	/*if (state != SYNC_CONTROLLER && state != SYNC_POSITION && state != DONE)
 	{
 		// Position update (diagonal moves doesn't work since they ink two dots... is not necessary to test them)
 		if (ReportData->HAT == HAT_RIGHT)
@@ -359,7 +403,7 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 		// Inking (the printing patterns above will not move outside the canvas... is not necessary to test them)
 		if (is_black(xpos, ypos))
 			ReportData->Button |= SWITCH_A;
-	}
+	}*/
 
 	// Prepare to echo this report
 	memcpy(&last_report, ReportData, sizeof(USB_JoystickReport_Input_t));
