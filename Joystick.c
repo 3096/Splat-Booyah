@@ -26,8 +26,6 @@ these buttons for our use.
 
 #include "Joystick.h"
 
-extern const uint8_t image_data[0x12c1] PROGMEM;
-
 // Main entry point.
 int main(void)
 {
@@ -149,10 +147,6 @@ void HID_Task(void)
 typedef enum {
 	SYNC_CONTROLLER,
 	BOOYAH,
-	SYNC_POSITION,
-	ZIG_ZAG,
-	MOVE,
-	STOP,
 	DONE
 } State_t;
 State_t state = SYNC_CONTROLLER;
@@ -192,55 +186,66 @@ int portsval = 0;
 
 #define max(a, b) (a > b ? a : b)
 #define ms_2_count(ms) (ms / ECHOES / (max(POLLING_MS, 8) / 8 * 8))
-#define is_black(x, y) (pgm_read_byte(&(image_data[((x) / 8) + ((y) * 40)])) & 1 << ((x) % 8))
-
-void complete_zig_zag_pattern(USB_JoystickReport_Input_t *const ReportData)
-{
-	// This function move the dot, switching between two consecutive lines, following
-	// the move pattern below while moving to the right:
-	//
-	//    3  4 ... N-5  N-4  N-1
-	// 1  2  5 ... N-6  N-3  N-2 <- (N, N+1)
-	//                       N+2
-	//
-	// and its specular one while moving to the left:
-	//
-	//             N-1  N-4  N-5 ... 4  3
-	// (N, N+1) -> N-2  N-3  N-6 ... 5  2  1
-	//             N+2
-	//
-	// In each pattern, the N and N+2 moves are the same, thus we need a stop in N+1,
-	// to avoid the acceleration triggered by two consecutive moves done in the same
-	// direction. This pattern pass on the same pixel 3 times (N-2, N and N+1), but
-	// is the easiest to check that I found.
-	uint8_t move_direction;
-
-	if (ypos % 4 < 2)
-		move_direction = HAT_RIGHT;
-	else
-		move_direction = HAT_LEFT;
-
-	if (command_count < 642)
-	{
-		if (command_count % 2 == 1)
-			ReportData->HAT = move_direction;
-		else if (command_count % 4 == 0)
-			ReportData->HAT = HAT_BOTTOM;
-		else
-			ReportData->HAT = HAT_TOP;
-		if (command_count == 640)
-			ReportData->HAT = HAT_CENTER;
-		else if (command_count == 639 || command_count == 641)
-			ReportData->HAT = HAT_BOTTOM;
-		command_count++;
-		return;
-	}
-
-	command_count = 0;
-	return;
-}
 
 bool moving_left = true;
+bool turning_left = true;
+
+void booyah(USB_JoystickReport_Input_t *const ReportData)
+{
+	bool a_down = false;
+	if(command_count % 2 != 0)
+	{
+		ReportData->Button |= SWITCH_A | SWITCH_RCLICK;
+		a_down = true;
+	}
+
+	// shoot and swim
+	bool shooting = true;
+	if(command_count/60 % 3 != 0)
+		ReportData->Button |= SWITCH_ZR;
+	else
+	{
+		ReportData->Button |= SWITCH_ZL;
+		shooting = false;
+	}
+
+	int rnd;
+
+	// Booyah!
+	if((rnd = rand() % 512) == 0 && a_down)
+		ReportData->HAT = HAT_BOTTOM;
+
+	// Attempt throw bomb
+	if((rnd = rand() % 16) == 0 && command_count % 180 < 15)
+		ReportData->Button |= SWITCH_R;
+
+	// Strafe left and right
+	if((rnd = rand() % 16) == 0)
+		moving_left = !moving_left;
+	if(moving_left)
+		ReportData->LX = STICK_MIN;
+	else
+		ReportData->LX = STICK_MAX;
+
+	// Move forward and backward
+	if(shooting == false)
+		ReportData->LY = STICK_MIN;
+	else
+		ReportData->LY = STICK_MAX;
+
+	// Turn left and right
+	if((rnd = rand() % 16) == 0)
+	{
+		if((rnd = rand() % 4) == 0)
+			turning_left = !turning_left;
+		if(turning_left)
+			ReportData->RX = STICK_MIN;
+		else
+			ReportData->RX = STICK_MAX;
+	}
+	
+}
+
 
 // Prepare the next report for the host
 void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
@@ -253,21 +258,6 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 	ReportData->RX = STICK_CENTER;
 	ReportData->RY = STICK_CENTER;
 	ReportData->HAT = HAT_CENTER;
-
-#if defined(ZIG_ZAG_PRINTING) && defined(SYNC_TO_30_FPS)
-	if (state == ZIG_ZAG)
-	{
-		// Inject an additional echo every 192 ms, aligning the command stream to 200 ms (equivalent to 6 video frames)
-		report_count++;
-		if (report_count == 24) // this seems be the best spot to inject the echo...
-		{
-			memcpy(ReportData, &last_report, sizeof(USB_JoystickReport_Input_t));
-			return;
-		}
-		if (report_count == 25) // reset the report count every 25 reports (200 ms)
-			report_count = 0;
-	}
-#endif
 
 	// Repeat ECHOES times the last report
 	if (echoes > 0)
@@ -295,88 +285,9 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 			command_count++;
 		}
 		break;
-	case BOOYAH: ;
-		bool a_down = false;
-		if(command_count % 2 != 0)
-		{
-			ReportData->Button |= SWITCH_A | SWITCH_RCLICK;
-			a_down = true;
-		}
-
-		if(command_count/60 % 3 != 0)
-			ReportData->Button |= SWITCH_ZR;
-		else
-			ReportData->Button |= SWITCH_ZL;
-
-		int rnd;
-
-		// Booyah!
-		if((rnd = rand() % 512) == 0 && a_down)
-			ReportData->HAT = HAT_BOTTOM;
-
-		if((rnd = rand() % 16) == 0)
-			moving_left = !moving_left;
-		if(moving_left)
-			ReportData->LX = STICK_MIN;
-		else
-			ReportData->LX = STICK_MAX;
-
-		ReportData->LY = STICK_MIN;
-
-		if((rnd = rand() % 16) == 0)
-		{
-			if((rnd = rand() % 4) == 0)
-				moving_left = !moving_left;
-			if(moving_left)
-				ReportData->RX = STICK_MIN;
-			else
-				ReportData->RX = STICK_MAX;
-		}
-
-
+	case BOOYAH:
+		booyah(ReportData);
 		command_count++;
-		break;
-	case SYNC_POSITION:
-		if (command_count > ms_2_count(4000))
-		{
-			command_count = 0;
-			xpos = 0;
-			ypos = 0;
-#if defined(ZIG_ZAG_PRINTING)
-			state = ZIG_ZAG;
-#else
-			state = STOP;
-#endif
-		}
-		else
-		{
-			// Moving faster with LX/LY
-			ReportData->LX = STICK_MIN;
-			ReportData->LY = STICK_MIN;
-			// Clear the screen
-			if (command_count == ms_2_count(1500) || command_count == ms_2_count(3000))
-				ReportData->Button |= SWITCH_MINUS;
-			command_count++;
-		}
-		break;
-	case ZIG_ZAG:
-		complete_zig_zag_pattern(ReportData);
-		if (ypos > 119)
-			state = DONE;
-		break;
-	case MOVE:
-		if ((xpos == 0 && ypos % 2 == 1) || (xpos == 319 && ypos % 2 == 0))
-			ReportData->HAT = HAT_BOTTOM;
-		else if (ypos % 2 == 0)
-			ReportData->HAT = HAT_RIGHT;
-		else
-			ReportData->HAT = HAT_LEFT;
-		state = STOP;
-		break;
-	case STOP:
-		state = MOVE;
-		if (ypos > 119)
-			state = DONE;
 		break;
 	case DONE:
 #ifdef ALERT_WHEN_DONE
@@ -387,23 +298,6 @@ void GetNextReport(USB_JoystickReport_Input_t *const ReportData)
 #endif
 		return;
 	}
-
-	/*if (state != SYNC_CONTROLLER && state != SYNC_POSITION && state != DONE)
-	{
-		// Position update (diagonal moves doesn't work since they ink two dots... is not necessary to test them)
-		if (ReportData->HAT == HAT_RIGHT)
-			xpos++;
-		else if (ReportData->HAT == HAT_LEFT)
-			xpos--;
-		else if (ReportData->HAT == HAT_TOP)
-			ypos--;
-		else if (ReportData->HAT == HAT_BOTTOM)
-			ypos++;
-
-		// Inking (the printing patterns above will not move outside the canvas... is not necessary to test them)
-		if (is_black(xpos, ypos))
-			ReportData->Button |= SWITCH_A;
-	}*/
 
 	// Prepare to echo this report
 	memcpy(&last_report, ReportData, sizeof(USB_JoystickReport_Input_t));
