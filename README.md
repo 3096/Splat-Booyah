@@ -9,13 +9,16 @@ On June 20, 2017, Nintendo released System Update v3.0.0 for the Nintendo Switch
 Unlike the Wii U, which handles these controllers on a 'per-game' basis, the Switch treats the Pokken controller as if it was a Switch Pro Controller. Along with having the icon for the Pro Controller, it functions just like it in terms of using it in other games, apart from the lack of physical controls such as analog sticks, the buttons for the stick clicks, or other system buttons such as Home or Capture.
 
 ### Booyah?
-For my own personal experiment, I re-purposed Switch-Fightstick to use random inputs to spray ink in turf war.
+For my own personal experiment, I re-purposed Switch-Fightstick to use random inputs to spray ink in turf war. You can see it in action on my [Twitch channel](https://www.twitch.tv/dualie).
 
 #### That's bad. Your team will lose...
 I like to see the world burn.
 
 #### I'll repor-
-I mean after like a few matches, it'll be ranked into only playing with baby squids by the match making anyway. They most likely don't play much better than random inputs anyway.
+I mean after like a few matches, it'll be ranked into only playing with baby squids by the match making anyway. Some of them don't even play that much better than random inputs anyway, and almost every match has a disconnect.
+
+#### To-do List
+[Here](https://github.com/3096/Splat-Booyah/projects/1#column-2504371)
 
 #### Compiling and Flashing onto the Teensy 2.0++
 Go to the Teensy website and download/install the [Teensy Loader application](https://www.pjrc.com/teensy/loader.html). For Linux, follow their instructions for installing the [GCC Compiler and Tools](https://www.pjrc.com/teensy/gcc.html). For Windows, you will need the [latest AVR toolchain](http://www.atmel.com/tools/atmelavrtoolchainforwindows.aspx) from the Atmel site. See [this issue](https://github.com/LightningStalker/Splatmeme-Printer/issues/10) and [this thread](http://gbatemp.net/threads/how-to-use-shinyquagsires-splatoon-2-post-printer.479497/) on GBAtemp for more information. (Note for Mac users - the AVR MacPack is now called AVR CrossPack. If that does not work, you can try installing `avr-gcc` with `brew`.)

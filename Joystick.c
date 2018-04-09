@@ -216,7 +216,7 @@ void booyah(USB_JoystickReport_Input_t *const ReportData)
 		ReportData->HAT = HAT_BOTTOM;
 
 	// Attempt throw bomb
-	if((rnd = rand() % 16) == 0 && command_count % 180 < 15)
+	if((rnd = rand() % 16) == 0 && command_count % 180 < 15 && !shooting)
 		ReportData->Button |= SWITCH_R;
 
 	// Strafe left and right
@@ -228,7 +228,7 @@ void booyah(USB_JoystickReport_Input_t *const ReportData)
 		ReportData->LX = STICK_MAX;
 
 	// Move forward and backward
-	if(shooting == false)
+	if(!shooting)
 		ReportData->LY = STICK_MIN;
 	else
 		ReportData->LY = STICK_MAX;
